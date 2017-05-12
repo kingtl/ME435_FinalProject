@@ -22,10 +22,7 @@ import android.widget.ViewFlipper;
 import edu.rosehulman.me435.NavUtils;
 import edu.rosehulman.me435.RobotActivity;
 
-import static edu.rosehulman.kingtl.integratedimagerec.GolfBallDeliveryActivity.State.DRIVE_TOWARDS_FAR_BALL;
-import static edu.rosehulman.kingtl.integratedimagerec.GolfBallDeliveryActivity.State.DRIVE_TOWARDS_HOME;
-import static edu.rosehulman.kingtl.integratedimagerec.GolfBallDeliveryActivity.State.SEEKING_HOME;
-import static edu.rosehulman.kingtl.integratedimagerec.GolfBallDeliveryActivity.State.WAITING_FOR_PICKUP;
+import static android.R.attr.factor;
 
 public class GolfBallDeliveryActivity extends ImageRecActivity {
 
@@ -33,6 +30,9 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
      * Constant used with logging that you'll see later.
      */
     public static final String TAG = "GolfBallDelivery";
+    public double golfBallTurnAmount;
+    public double mRightTurnAmountGolf;
+    public double mLeftTurnAmountGolf;
 
     protected long mLoopCounter;
 
@@ -147,12 +147,12 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
     /**
      * Multiplier used during seeking to calculate a PWM value based on the turn amount needed.
      */
-    private static final double SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER = 3.0;  // units are (PWM value)/degrees
+    public static final double SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER = 3.0;  // units are (PWM value)/degrees
 
     /**
      * Variable used to cap the slowest PWM duty cycle used while seeking. Pick a value from -255 to 255.
      */
-    private static final int LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE = 150;
+    public static final int LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE = 150;
 
     /**
      * PWM duty cycle values used with the drive straight dialog that make your robot drive straightest.
@@ -199,6 +199,9 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         setLocationToColor(1, BallColor.RED);
         setLocationToColor(2, BallColor.WHITE);
         setLocationToColor(3, BallColor.BLUE);
+        mNearBallLocation = 1;
+        mWhiteBallLocation = 2;
+        mFarBallLocation = 3;
     }
 
     /**
@@ -273,32 +276,32 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         BallColor nearColor = mLocationColors[mNearBallLocation - 1];
         BallColor farColor = mLocationColors[mFarBallLocation - 1];
         if (mOnRedTeam) {
-            if (nearColor == BallColor.GREEN) {
+            if (nearColor.equals(BallColor.GREEN)) {
                 mNearBallGpsY = 50;
-            } else if (nearColor == BallColor.RED) {
+            } else if (nearColor.equals(BallColor.RED)) {
                 mNearBallGpsY = -50;
             }
-            if (farColor == BallColor.BLUE) {
+            if (farColor.equals(BallColor.BLUE)) {
                 mFarBallGpsY = 50;
-            } else if (farColor == BallColor.YELLOW) {
+            } else if (farColor.equals(BallColor.YELLOW)) {
                 mFarBallGpsY = -50;
             }
         } else {
-            if (farColor == BallColor.GREEN) {
+            if (farColor.equals(BallColor.GREEN)) {
                 mFarBallGpsY = -50;
-            } else if (farColor == BallColor.RED) {
+            } else if (farColor.equals(BallColor.RED)) {
                 mFarBallGpsY = 50;
             }
-            if (nearColor == BallColor.BLUE) {
+            if (nearColor.equals(BallColor.BLUE)) {
                 mNearBallGpsY = -50;
-            } else if (nearColor == BallColor.YELLOW) {
+            } else if (nearColor.equals(BallColor.YELLOW)) {
                 mNearBallGpsY = 50;
             }
         }
 
 
         Log.d(TAG, "Near ball is position " + mNearBallLocation + " so drive to " + mNearBallGpsY);
-        Log.d(TAG, "Far ball is position " + mNearBallLocation + " so drive to " + mFarBallGpsY);
+        Log.d(TAG, "Far ball is position " + mFarBallLocation + " so drive to " + mFarBallGpsY);
         Log.d(TAG, "White ball is position " + mWhiteBallLocation);
     }
 
@@ -334,29 +337,34 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
             mFirebaseRef.child("timer").child("stateTime").setValue(getStateTimeMs() / 1000);
         }
         switch (mState) {
-            case NEAR_BALL_SCRIPT:
-                //if ((mLocationColors[mNearBallLocation - 1] == BallColor.GREEN && (mOnRedTeam)) || (mLocationColors[mNearBallLocation - 1] == BallColor.YELLOW && (!mOnRedTeam))) {
-                    seekTarget(NEAR_BALL_GPS_X, mNearBallGpsY);
-                //} else if ((mLocationColors[mNearBallLocation - 1] == BallColor.BLUE && (!mOnRedTeam)) || (mLocationColors[mNearBallLocation - 1] == BallColor.RED) && (mOnRedTeam)) {
-                 //   seekTarget(90, mNearBallGpsY);
-                //}
-                break;
             case DRIVE_TOWARDS_FAR_BALL:
                 seekTarget(FAR_BALL_GPS_X, mFarBallGpsY);
+
+                if (mConeLeftRightLocation > 0.3 && mRightTurnAmountGolf < mLeftTurnAmountGolf) {
+                    mRightDutyCycle = mGolfBallDeliveryActivity.mLeftStraightPwmValue - (int) imageRecTurnFactor - (int) mGolfBallDeliveryActivity.golfBallTurnAmount;
+                    mLeftDutyCycle = mGolfBallDeliveryActivity.mLeftStraightPwmValue;
+
+                } else if (mConeLeftRightLocation < -0.3 && mLeftTurnAmountGolf < mRightTurnAmountGolf) {
+                    mRightDutyCycle = mGolfBallDeliveryActivity.mRightStraightPwmValue;
+                    mLeftDutyCycle = mGolfBallDeliveryActivity.mRightStraightPwmValue - (int) imageRecTurnFactor - (int) mGolfBallDeliveryActivity.golfBallTurnAmount;
+                }
+                mRightDutyCycle = Math.max(mRightDutyCycle, mGolfBallDeliveryActivity.LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE);
+                mLeftDutyCycle = Math.max(mLeftDutyCycle, mGolfBallDeliveryActivity.LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE);
+                sendWheelSpeed(mLeftDutyCycle, mRightDutyCycle);
                 break;
+
             case DRIVE_TOWARDS_HOME:
                 seekTarget(0, 0);
                 break;
             case WAITING_FOR_PICKUP:
                 if (getStateTimeMs() > 8000) {
-                    setState(SEEKING_HOME);
+                    setState(State.SEEKING_HOME);
                 }
                 break;
             case SEEKING_HOME:
                 seekTarget(0, 0);
                 if (getStateTimeMs() > 8000) {
-                    setState(WAITING_FOR_PICKUP);
-
+                    setState(State.WAITING_FOR_PICKUP);
                 }
                 //TODO: Add a timeout for waiting for pickup
                 break;
@@ -366,26 +374,33 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         }
     }
 
-    public void seekTarget(double x, double y) {
-        int leftDutyCycle = mLeftStraightPwmValue;
-        int rightDutyCycle = mRightStraightPwmValue;
+    private void seekTarget(double x, double y) {
+        // int leftDutyCycle = mLeftStraightPwmValue;
+        // int rightDutyCycle = mRightStraightPwmValue;
 
-        double targetHeadingGolf = NavUtils.getTargetHeading(mGuessX, mGuessY, x, y);
-        double leftTurnAmountGolf = NavUtils.getLeftTurnHeadingDelta(mCurrentSensorHeading, targetHeadingGolf);
-        double rightTurnAmountGolf = NavUtils.getRightTurnHeadingDelta(mCurrentSensorHeading, targetHeadingGolf);
+        double targetHeading = NavUtils.getTargetHeading(mGuessX, mGuessY, x, y);
+        mLeftTurnAmountGolf = NavUtils.getLeftTurnHeadingDelta(mCurrentSensorHeading, targetHeading);
+        mRightTurnAmountGolf = NavUtils.getRightTurnHeadingDelta(mCurrentSensorHeading, targetHeading);
 
-        if (leftTurnAmountGolf < rightTurnAmountGolf) {
+        if (mLeftTurnAmountGolf < mRightTurnAmountGolf) {
             //Need to turn left
             //To turn left, slow down the left wheel
-            leftDutyCycle = mLeftStraightPwmValue - (int) (leftTurnAmountGolf * SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER) - (int) (imageRecTurnFactor);
-            leftDutyCycle = Math.max(leftDutyCycle, LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE);
-        } else {
+            // leftDutyCycle = mLeftStraightPwmValue - (int) (leftTurnAmountGolf * SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER);
+            // leftDutyCycle = Math.max(leftDutyCycle, LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE);
+            golfBallTurnAmount = (int) (mLeftTurnAmountGolf * SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER);
+            //factor(false);
+
+        } else if (mRightTurnAmountGolf < mLeftTurnAmountGolf) {
             //Need to turn right
             //To turn right, slow down the right wheel
-            rightDutyCycle = mRightStraightPwmValue - (int) (rightTurnAmountGolf * SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER) - (int) (imageRecTurnFactor);
-            rightDutyCycle = Math.max(rightDutyCycle, LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE);
+            // rightDutyCycle = mRightStraightPwmValue - (int) (rightTurnAmountGolf * SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER);
+            // rightDutyCycle = Math.max(rightDutyCycle, LOWEST_DESIRABLE_SEEKING_DUTY_CYCLE);
+            golfBallTurnAmount = (int) (mRightTurnAmountGolf * SEEKING_DUTY_CYCLE_PER_ANGLE_OFF_MULTIPLIER);
+            //factor(true);
+        } else {
+            golfBallTurnAmount = 0;
         }
-        sendWheelSpeed(leftDutyCycle, rightDutyCycle);
+//        sendWheelSpeed(leftDutyCycle, rightDutyCycle);
     }
 
     // --------------------------- Drive command ---------------------------
@@ -412,15 +427,15 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         gpsInfo += "  " + mGpsCounter;
         mGpsInfoTextView.setText(gpsInfo);
 
-        if (mState == DRIVE_TOWARDS_FAR_BALL) {
+        if (mState == State.DRIVE_TOWARDS_FAR_BALL) {
             double distanceToTarget = NavUtils.getDistance(mCurrentGpsX, mCurrentGpsY, FAR_BALL_GPS_X, mFarBallGpsY);
             if (distanceToTarget < ACCEPTED_DISTANCE_AWAY_FT) {
                 setState(State.FAR_BALL_SCRIPT);
             }
         }
-        if (mState == DRIVE_TOWARDS_HOME) {
+        if (mState == State.DRIVE_TOWARDS_HOME) {
             if (mCurrentGpsDistance < ACCEPTED_DISTANCE_AWAY_FT) {
-                setState(WAITING_FOR_PICKUP);
+                setState(State.WAITING_FOR_PICKUP);
             }
         }
     }
@@ -513,24 +528,24 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         if (location.equalsIgnoreCase("L1")) {
             setLocationToColor(1, color);
             if (mOnRedTeam) {
-                if (color == BallColor.BLUE || color == BallColor.YELLOW) {
+                if (color.equals(BallColor.BLUE) || color.equals(BallColor.YELLOW)) {
                     mFarBallLocation = 1;
-                } else if (color == BallColor.GREEN || color == BallColor.RED) {
+                } else if (color.equals(BallColor.GREEN) || color.equals(BallColor.RED)) {
                     mNearBallLocation = 1;
                 } else {
-                    if (color == BallColor.WHITE) {
+                    if (color.equals(BallColor.WHITE)) {
                         mWhiteBallLocation = 1;
                     } else {
                         // Do nothing (black ball remains on stand)
                     }
                 }
             } else { // Blue team
-                if (color == BallColor.BLUE || color == BallColor.YELLOW) {
+                if (color.equals(BallColor.BLUE) || color.equals(BallColor.YELLOW)) {
                     mNearBallLocation = 1;
-                } else if (color == BallColor.GREEN || color == BallColor.RED) {
+                } else if (color.equals(BallColor.GREEN) || color.equals(BallColor.RED)) {
                     mFarBallLocation = 1;
                 } else {
-                    if (color == BallColor.WHITE) {
+                    if (color.equals(BallColor.WHITE)) {
                         mWhiteBallLocation = 1;
                     } else {
                         // Do nothing (black ball remains on stand)
@@ -540,24 +555,24 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         } else if (location.equalsIgnoreCase("L2")) {
             setLocationToColor(2, color);
             if (mOnRedTeam) {
-                if (color == BallColor.BLUE || color == BallColor.YELLOW) {
+                if (color.equals(BallColor.BLUE) || color.equals(BallColor.YELLOW)) {
                     mFarBallLocation = 2;
-                } else if (color == BallColor.GREEN || color == BallColor.RED) {
+                } else if (color.equals(BallColor.GREEN) || color.equals(BallColor.RED)) {
                     mNearBallLocation = 2;
                 } else {
-                    if (color == BallColor.WHITE) {
+                    if (color.equals(BallColor.WHITE)) {
                         mWhiteBallLocation = 2;
                     } else {
                         // Do nothing (black ball remains on stand)
                     }
                 }
             } else { //Blue team
-                if (color == BallColor.BLUE || color == BallColor.YELLOW) {
+                if (color.equals(BallColor.BLUE) || color.equals(BallColor.YELLOW)) {
                     mNearBallLocation = 2;
-                } else if (color == BallColor.GREEN || color == BallColor.RED) {
+                } else if (color.equals(BallColor.GREEN) || color.equals(BallColor.RED)) {
                     mFarBallLocation = 2;
                 } else {
-                    if (color == BallColor.WHITE) {
+                    if (color.equals(BallColor.WHITE)) {
                         mWhiteBallLocation = 2;
                     } else {
                         // Do nothing (black ball remains on stand)
@@ -569,24 +584,24 @@ public class GolfBallDeliveryActivity extends ImageRecActivity {
         } else if (location.equalsIgnoreCase("L3")) {
             setLocationToColor(3, color);
             if (mOnRedTeam) {
-                if (color == BallColor.BLUE || color == BallColor.YELLOW) {
+                if (color.equals(BallColor.BLUE) || color.equals(BallColor.YELLOW)) {
                     mFarBallLocation = 3;
-                } else if (color == BallColor.GREEN || color == BallColor.RED) {
+                } else if (color.equals(BallColor.GREEN) || color.equals(BallColor.RED)) {
                     mNearBallLocation = 3;
                 } else {
-                    if (color == BallColor.WHITE) {
+                    if (color.equals(BallColor.WHITE)) {
                         mWhiteBallLocation = 3;
                     } else {
                         // Do nothing (black ball remains on stand)
                     }
                 }
             } else { //on Blue team
-                if (color == BallColor.BLUE || color == BallColor.YELLOW) {
+                if (color.equals(BallColor.BLUE) || color.equals(BallColor.YELLOW)) {
                     mNearBallLocation = 3;
-                } else if (color == BallColor.GREEN || color == BallColor.RED) {
+                } else if (color.equals(BallColor.GREEN) || color.equals(BallColor.RED)) {
                     mFarBallLocation = 3;
                 } else {
-                    if (color == BallColor.WHITE) {
+                    if (color.equals(BallColor.WHITE)) {
                         mWhiteBallLocation = 3;
                     } else {
                         // Do nothing (black ball remains on stand)

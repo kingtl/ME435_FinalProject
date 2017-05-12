@@ -34,19 +34,16 @@ public class Scripts {
     }
 
     public void nearBallScript() {
-        //mGolfBallDeliveryActivity.sendWheelSpeed(mGolfBallDeliveryActivity.mLeftStraightPwmValue,
-                //mGolfBallDeliveryActivity.mRightStraightPwmValue);
+        mGolfBallDeliveryActivity.sendWheelSpeed(mGolfBallDeliveryActivity.mLeftStraightPwmValue,
+                mGolfBallDeliveryActivity.mRightStraightPwmValue);
         double distanceToNearBall = 100;
 
         GolfBallDeliveryActivity.BallColor color = mGolfBallDeliveryActivity.mLocationColors[mGolfBallDeliveryActivity.mNearBallLocation - 1];
-            if (color==GolfBallDeliveryActivity.BallColor.GREEN || color==GolfBallDeliveryActivity.BallColor.YELLOW) {
-                distanceToNearBall = NavUtils.getDistance(mGolfBallDeliveryActivity.mCurrentGpsX, mGolfBallDeliveryActivity.mCurrentGpsY, 90, 50);
-//                mGolfBallDeliveryActivity.seekTarget(90,50);
+            if (color.equals(GolfBallDeliveryActivity.BallColor.GREEN) || color.equals(GolfBallDeliveryActivity.BallColor.YELLOW)) {
+                distanceToNearBall = NavUtils.getDistance(15, 0, 90, 50);
             }
-            else if (color==GolfBallDeliveryActivity.BallColor.RED || color==GolfBallDeliveryActivity.BallColor.BLUE){
-                distanceToNearBall = NavUtils.getDistance(mGolfBallDeliveryActivity.mCurrentGpsX, mGolfBallDeliveryActivity.mCurrentGpsY, 90, -50);
-//                mGolfBallDeliveryActivity.seekTarget(90,-50);
-
+            else if (color.equals(GolfBallDeliveryActivity.BallColor.RED) || color.equals(GolfBallDeliveryActivity.BallColor.BLUE)){
+                distanceToNearBall = NavUtils.getDistance(15, 0, 90, -50);
             }
 
         long driveTimeToNearBallMs = (long) (distanceToNearBall / RobotActivity.DEFAULT_SPEED_FT_PER_SEC * 1000);
@@ -94,7 +91,6 @@ public class Scripts {
         mGolfBallDeliveryActivity.sendCommand("ATTACH 111111");
         mGolfBallDeliveryActivity.sendCommand("POSITION 0 90 0 -90 90"); // Stand position
         mGolfBallDeliveryActivity.sendCommand("GRIPPER 50");
-        mGolfBallDeliveryActivity.sendWheelSpeed(0,0);
 
         mCommandHandler.postDelayed(new Runnable() {
             @Override

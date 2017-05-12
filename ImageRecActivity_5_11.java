@@ -46,8 +46,6 @@ import edu.rosehulman.me435.RobotActivity;
 
 public class ImageRecActivity extends RobotActivity implements CameraBridgeViewBase.CvCameraViewListener2, View.OnTouchListener {
 
-    public double imageRecTurnFactor;
-    public GolfBallDeliveryActivity mGolfBallDeliveryActivity;
     public static final String TAG = "ConeFinder";
     /**
      * References to the UI widgets used in this demo app.
@@ -55,7 +53,7 @@ public class ImageRecActivity extends RobotActivity implements CameraBridgeViewB
     private TextView mLeftRightLocationTextView, mTopBottomLocationTextView, mSizePercentageTextView;
 
     protected ViewFlipper mViewFlipper;
-
+    public double imageRecTurnFactor;
 
     /**
      * References to the UI for image rec parameters for the target and range HSV values.
@@ -125,10 +123,11 @@ public class ImageRecActivity extends RobotActivity implements CameraBridgeViewB
     private Mat mRgba;
     protected DatabaseReference mFirebaseRef;
 
+    GolfBallDeliveryActivity mGolfBallDeliveryActivity;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mGolfBallDeliveryActivity = new GolfBallDeliveryActivity();
         //setContentView(R.layout.activity_cone_finder);
         setContentView(R.layout.activity_main);
         //Write a message to the database
@@ -151,6 +150,8 @@ public class ImageRecActivity extends RobotActivity implements CameraBridgeViewB
         mRangeHTextView = (TextView) findViewById(R.id.range_h_textview);
         mRangeSTextView = (TextView) findViewById(R.id.range_s_textview);
         mRangeVTextView = (TextView) findViewById(R.id.range_v_textview);
+
+        mGolfBallDeliveryActivity = new GolfBallDeliveryActivity();
 
         mRangeHSeekBar.setMax(255);
         mRangeSSeekBar.setMax(255);
@@ -255,24 +256,39 @@ public class ImageRecActivity extends RobotActivity implements CameraBridgeViewB
         mConeLeftRightLocation = leftRightLocation; //Note, if coneFound is false
         mConeTopBottomLocation = topBottomLocation; //then these values are junk values
         mConeSize = sizePercentage; //Don't read these values at all if coneFound is false.
-
-        double targetHeading = NavUtils.getTargetHeading(mGuessX, mGuessY, mCurrentGpsX, mCurrentGpsY);
-        double leftTurnAmount = NavUtils.getLeftTurnHeadingDelta(mCurrentSensorHeading, targetHeading);
-        double rightTurnAmount = NavUtils.getRightTurnHeadingDelta(mCurrentSensorHeading, targetHeading);
-
-
         if (coneFound) {
             mLeftRightLocationTextView.setText(String.format("%.3f", leftRightLocation));
             mTopBottomLocationTextView.setText(String.format("%.3f", topBottomLocation));
             mSizePercentageTextView.setText(String.format("%.3f", sizePercentage));
-            if (mConeLeftRightLocation > 0.3) // Right
-                imageRecTurnFactor = leftTurnAmount * (mGolfBallDeliveryActivity.mLeftStraightPwmValue);
-            else if (mConeLeftRightLocation < -0.3) {
-                imageRecTurnFactor = rightTurnAmount * mConeLeftRightLocation * .95;
+
+            double targetHeading = NavUtils.getTargetHeading(mGuessX, mGuessY, mCurrentGpsX, mCurrentGpsY);
+            double leftTurnAmount = NavUtils.getLeftTurnHeadingDelta(mCurrentSensorHeading, targetHeading);
+            double rightTurnAmount = NavUtils.getRightTurnHeadingDelta(mCurrentSensorHeading, targetHeading);
+
+            //double distanceAway = ;
+            if (mGolfBallDeliveryActivity.mState == GolfBallDeliveryActivity.State.NEAR_BALL_SCRIPT) {
+                if (mConeLeftRightLocation > 0.3) { //Right
+                    // mRightDutyCycle = mGolfBallDeliveryActivity.mLeftStraightPwmValue - (int) (leftTurnAmount * (mConeLeftRightLocation * .95));
+                    imageRecTurnFactor = (leftTurnAmount * (mConeLeftRightLocation * .95));
+                } else if (mConeLeftRightLocation < -0.3) { //Left
+                    // mLeftDutyCycle = mGolfBallDeliveryActivity.mRightStraightPwmValue - (int) (rightTurnAmount * (mConeLeftRightLocation * .95));
+                    imageRecTurnFactor = (rightTurnAmount * (mConeLeftRightLocation * .95));
+                }
+                // sendWheelSpeed(mLeftDutyCycle, mRightDutyCycle);
+            } else if (mGolfBallDeliveryActivity.mState == GolfBallDeliveryActivity.State.DRIVE_TOWARDS_FAR_BALL) {
+                if (mConeLeftRightLocation > 0.3) {
+                    // mRightDutyCycle = mGolfBallDeliveryActivity.mLeftStraightPwmValue - (int) (leftTurnAmount * (mConeLeftRightLocation * .95));
+                    imageRecTurnFactor = (leftTurnAmount * (mConeLeftRightLocation * .95));
+                } else if (mConeLeftRightLocation < -0.3) {
+                    // mLeftDutyCycle = mGolfBallDeliveryActivity.mRightStraightPwmValue - (int) (rightTurnAmount * (mConeLeftRightLocation * .95));
+                    imageRecTurnFactor = (rightTurnAmount * (mConeLeftRightLocation * .95));
+
+                }
+                // sendWheelSpeed(mLeftDutyCycle, mRightDutyCycle);
             } else {
                 imageRecTurnFactor = 0;
             }
-        } else { //No cone found;
+        } else { //No cone found
             imageRecTurnFactor = 0;
             mLeftRightLocationTextView.setText("---");
             mTopBottomLocationTextView.setText("---");
@@ -504,7 +520,6 @@ public class ImageRecActivity extends RobotActivity implements CameraBridgeViewB
         }
     }
 
-
     @Override
     public boolean onTouch(View v, MotionEvent event) {
         if (mViewFlipper.getDisplayedChild() != 1) {
@@ -557,4 +572,5 @@ public class ImageRecActivity extends RobotActivity implements CameraBridgeViewB
 
         return false; // don't need subsequent touch events
     }
+
 }
